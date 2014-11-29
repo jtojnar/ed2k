@@ -4,7 +4,7 @@ import hashlib
 import os, sys
 from Crypto.Hash import MD4
 
-if len(sys.argv) == 0:
+if len(sys.argv) == 1:
 	print("This quickly gets ed2k links for anidb crequing.")
 	print("Usage: %s [files]" % sys.argv[0])
 	exit()
