@@ -29,7 +29,7 @@ def ed2k(file_name):
 			ed2k_hash += md4(block).digest()
 		#on size of modulo block size, append another md4 hash of a blank string
 		if file_size % ed2k_block == 0:
-			ed2k_hash += md4('').digest()
+			ed2k_hash += md4(b'').digest()
 
 	#finally
 	ed2k_hash = md4(ed2k_hash).hexdigest()
