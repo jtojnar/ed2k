@@ -28,11 +28,14 @@ def ed2k(file_name):
 			#hashes are concatenated md4 per block size for ed2k hash
 			ed2k_hash += md4(block).digest()
 		#on size of modulo block size, append another md4 hash of a blank string
-		if file_size % ed2k_block == 0:
-			ed2k_hash += md4('').digest()
+		if file_size > 0 and file_size % ed2k_block == 0:
+			ed2k_hash += md4(b'').digest()
 
 	#finally
-	ed2k_hash = md4(ed2k_hash).hexdigest()
+	if len(ed2k_hash) == 16:
+		ed2k_hash = ed2k_hash.hex()
+	else:
+		ed2k_hash = md4(ed2k_hash).hexdigest()
 	return [ file_size, ed2k_hash ]
 
 
