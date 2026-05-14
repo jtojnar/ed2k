@@ -39,9 +39,10 @@ def ed2k(file_name):
 	return [ file_size, ed2k_hash ]
 
 
-# ed2k sample link: ed2k://|file|The_Two_Towers-The_Purist_Edit-Trailer.avi|14997504|965c013e991ee246d63d45ea71954c4d|/
+# Sample ed2k link: ed2k://|file|The_Two_Towers-The_Purist_Edit-Trailer.avi|14997504|965c013e991ee246d63d45ea71954c4d|/
+# Sample magnet link: magnet:?xl=14997504&dn=The_Two_Towers-The_Purist_Edit-Trailer.avi&xt=urn:ed2k:965c013e991ee246d63d45ea71954c4d
 for file in sys.argv[1:]:
 	filebase = os.path.basename(file)
 	size, hash = ed2k(file)
-	print("ed2k://|file|{filebase}|{size}|{hash}|/".format(filebase = filebase, size = size, hash = hash))
-
+	print(f"ed2k://|file|{filebase}|{size}|{hash}|/")
+	print(f"magnet:?xl={size}&dn={filebase}&xt=urn:ed2k:{hash}")
