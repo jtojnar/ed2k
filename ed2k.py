@@ -1,44 +1,112 @@
 #!/usr/bin/env python3
 
-import hashlib
-import os, sys
+# SPDX-FileCopyrightText: 2026 Jan Tojnar
+# SPDX-License-Identifier: MIT
+
+
 from Crypto.Hash import MD4
-
-if len(sys.argv) == 1:
-	print("This quickly gets ed2k links for anidb crequing.")
-	print("Usage: %s [files]" % sys.argv[0])
-	exit()
-
-def md4(x):
-	h = MD4.new()
-	h.update(x)
-	return h
-
-def ed2k(file_name):
-	ed2k_block = 9500 * 1024
-	ed2k_hash = b''
-	file_size = None
-	with open(file_name, 'rb') as f:
-		file_size = os.fstat(f.fileno()).st_size #while at it, fetch the size of the file
-		while True:
-			block = f.read(ed2k_block)
-			if not block:
-				break
-
-			#hashes are concatenated md4 per block size for ed2k hash
-			ed2k_hash += md4(block).digest()
-		#on size of modulo block size, append another md4 hash of a blank string
-		if file_size % ed2k_block == 0:
-			ed2k_hash += md4('').digest()
-
-	#finally
-	ed2k_hash = md4(ed2k_hash).hexdigest()
-	return [ file_size, ed2k_hash ]
+from collections.abc import Iterator
+from dataclasses import dataclass
+from functools import partial
+from pathlib import Path
+from typing import Sequence
+from urllib.parse import quote
+import argparse
+import sys
 
 
-# ed2k sample link: ed2k://|file|The_Two_Towers-The_Purist_Edit-Trailer.avi|14997504|965c013e991ee246d63d45ea71954c4d|/
-for file in sys.argv[1:]:
-	filebase = os.path.basename(file)
-	size, hash = ed2k(file)
-	print("ed2k://|file|{filebase}|{size}|{hash}|/".format(filebase = filebase, size = size, hash = hash))
+ED2K_CHUNK_SIZE = 9500 * 1024
 
+
+@dataclass
+class Ed2kHash:
+    """Result of ed2k hashing"""
+
+    name: str
+    size: int
+    root_hash: str
+
+    def ed2k_uri(self) -> str:
+        """Formats the hash as an ed2k URI."""
+        return f"ed2k://|file|{quote(self.name)}|{self.size}|{self.root_hash}|/"
+
+
+def chunks(path: Path, chunk_size: int) -> Iterator[bytes]:
+    """Splits file into chunks of `chunk_size` bytes."""
+    with path.open("rb") as f:
+        for chunk in iter(partial(f.read, chunk_size), b""):
+            yield chunk
+
+
+def md4(data: bytes) -> bytes:
+    """Calculates MD4 checksum of `data`."""
+    h = MD4.new()
+    h.update(data)
+    return h.digest()
+
+
+def ed2k_root_hash(ed2k_chunks: Iterator[bytes]) -> str:
+    """Calculates eD2k root hash (hash of the hash list) for the chunks."""
+    h = MD4.new()
+
+    for chunk in ed2k_chunks:
+        h.update(md4(chunk))
+
+    return h.hexdigest()
+
+
+def ed2k(path: Path) -> Ed2kHash:
+    """Calculates an eD2k hash for given file."""
+    name = path.name
+    size = path.stat().st_size
+
+    if size <= ED2K_CHUNK_SIZE:
+        root_hash = md4(path.read_bytes()).hex()
+    else:
+        ed2k_chunks = chunks(path, ED2K_CHUNK_SIZE)
+        root_hash = ed2k_root_hash(ed2k_chunks)
+
+    return Ed2kHash(name, size, root_hash)
+
+
+def hash_and_print(files: Sequence[Path]) -> bool:
+    """Calculates hash for each file and outputs the result as URI."""
+    all_okay = True
+
+    for file in files:
+        try:
+            print(ed2k(file).ed2k_uri())
+        except Exception as e:
+            all_okay = False
+            print(f"Failed to hash {file}: {e}", file=sys.stderr)
+
+    return all_okay
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Produces ed2k hashes of files",
+    )
+
+    parser.add_argument(
+        "files",
+        metavar="FILE",
+        nargs="+",
+        type=Path,
+        help="Files to hash",
+    )
+
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None | str:
+    args = parse_args(argv)
+
+    if not hash_and_print(args.files):
+        return "Could not hash some files"
+
+    return None
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
